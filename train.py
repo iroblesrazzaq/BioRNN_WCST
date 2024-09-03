@@ -99,7 +99,7 @@ def train_bpxtrials_v2_working(hp):
     elif task=='salzman':
         rule_list = ['cxt1', 'cxt2']    # for the Fusi&Salzman task
     elif task=='wcst':
-        rule_list = ['color', 'shape']
+        rule_list = ['color', 'shape', 'number']
         print('rule_list={}\n'.format(rule_list), flush=True)
     print('\ntask name: {}\n'.format(task))
 

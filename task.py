@@ -75,82 +75,65 @@ class WCST():
         self.n_ts = (self.timestamps['trial_end'] - self.timestamps['trial_start'])//self.dt
         self.n_ts = int(self.n_ts)
     
-    def make_task_1tr(self):
-        # generate the center card
-#         print('self.rule_list = {}'.format(self.rule_list), flush=True)
-        center_card = dict.fromkeys(self.rule_list)    # the card to match all the other cards to
+        def make_task_1tr(self):
+        # Generate the center card
+        center_card = dict.fromkeys(self.rule_list)
         for r in self.rule_list:
             center_card[r] = random.randrange(self.n_features_per_rule)
         
-        # generate the test cards
+        # Generate the test cards
         test_cards = dict.fromkeys(np.arange(self.n_test_cards))  
         for c in range(self.n_test_cards):
-            test_cards[c] = dict.fromkeys(self.rule_list)    # each card is also a dict
-        ## define the matched features. The match card as the same rule feature as the center card, whereas the nonmatch card has the same (random) non-rule feature as the center card
-        match_card_id = np.random.choice(np.arange(self.n_test_cards))    # which card is the matched one
-#         print('center card={}'.format(center_card), flush=True)
-        test_cards[match_card_id][self.rule] = center_card[self.rule]    # the match card has the same rule feature as the center card
-        ## define the irrelevant rule and the nonmatch card. The nonmatch card has the same feature for the irrelvant rule as the center card 
-        irrel_rule = random.choice([r for r in self.rule_list if r!=self.rule])    # the irrelevant rule, or the rule that the nonmatch card has the same feature as the center card   
-#         nonmatch_card_id = [c for c in np.arange(self.n_test_cards) if c!=match_card_id][0]    # the nonmatch card is a random card from the rest
-        nonmatch_card_id = random.choice([c for c in np.arange(self.n_test_cards) if c!=match_card_id])    # the nonmatch card is a random card from the rest
-        test_cards[nonmatch_card_id][irrel_rule] = center_card[irrel_rule]    # the nonmatch card has the same feature as the center card but for the invalid rule 
-        ## define the other features
+            test_cards[c] = dict.fromkeys(self.rule_list)
+        
+        # Define the matched features
+        match_card_id = np.random.choice(np.arange(self.n_test_cards))
+        test_cards[match_card_id][self.rule] = center_card[self.rule]
+        
+        # Define the irrelevant rules and the nonmatch card
+        irrel_rules = [r for r in self.rule_list if r != self.rule]
+        nonmatch_card_id = random.choice([c for c in np.arange(self.n_test_cards) if c != match_card_id])
+        irrel_rule = random.choice(irrel_rules)
+        test_cards[nonmatch_card_id][irrel_rule] = center_card[irrel_rule]
+        
+        # Define the other features
         for c in range(self.n_test_cards):
             for r in self.rule_list:
-                if (c==match_card_id and r==self.rule) or (c==nonmatch_card_id and r==irrel_rule):
+                if (c == match_card_id and r == self.rule) or (c == nonmatch_card_id and r == irrel_rule):
                     continue
-                elif (c!=match_card_id and r==self.rule):
-                    test_cards[c][r] = random.choice([f for f in range(self.n_features_per_rule) if f!=center_card[self.rule]])
-                elif (c!=nonmatch_card_id and r==irrel_rule):
-                    test_cards[c][r] = random.choice([f for f in range(self.n_features_per_rule) if f!=center_card[irrel_rule]])
-#                 else:
-#                     test_cards[c][r] = random.randrange(self.n_features_per_rule)    # other features can be random
-#                     print('test card {}, {}={}\n'.format(c, r, test_cards[c][r]), flush=True)
-        
-        
-#         print('center card: {}\ntest cards: {}'.format(center_card, test_cards), flush=True)
-#         print('rule={}, match_card_id={}, nonmatch_card_id={}\n'.format(self.rule, match_card_id, nonmatch_card_id), flush=True)
-        
-        
-        # generate the input and target currents
-        x = torch.zeros([self.n_ts, self.n_features_per_rule*len(self.rule_list)*(self.n_test_cards+1)])    # along the last dimension, the first few entries are the properties of the center card, the rest are the test cards
-#         print('n_ts = {}'.format(self.n_ts), flush=True)
+                elif r == self.rule:
+                    test_cards[c][r] = random.choice([f for f in range(self.n_features_per_rule) if f != center_card[r]])
+                else:
+                    test_cards[c][r] = random.randrange(self.n_features_per_rule)
+
+        # Generate the input and target currents
+        n_features = self.n_features_per_rule * len(self.rule_list)
+        x = torch.zeros([self.n_ts, n_features * (self.n_test_cards + 1)])
         x_rule = torch.zeros([self.n_ts, len(self.rule_list)])
         yhat = torch.zeros([self.n_ts, self.n_test_cards])
         yhat_rule = torch.zeros([self.n_ts, len(self.rule_list)])
         
-        ## center card
-        x_idx = 0     # the current index for the input
-#         print('center card', flush=True)
+        # Center card
+        x_idx = 0
         for r in self.rule_list:
-#             print('rule {}'.format(r), flush=True)
-#             print('x_idx={}'.format(x_idx), flush=True)
-            x[int(self.timestamps['center_card_on']//self.dt):int(self.timestamps['center_card_off']//self.dt), x_idx+center_card[r]] = 1
+            x[int(self.timestamps['center_card_on']//self.dt):int(self.timestamps['center_card_off']//self.dt),
+            x_idx + center_card[r]] = 1
             x_idx += self.n_features_per_rule
-        ## test cards
-        for c in range(self.n_test_cards):
-#             print('test card {}'.format(c), flush=True)
-            for r in self.rule_list:
-#                 print('rule {}'.format(r), flush=True)
-#                 print('x_idx={}'.format(x_idx), flush=True)
-#                 print('x shape: {}'.format(x.shape), flush=True)
-#                 print('test_cards[c][r]={}'.format(test_cards[c][r]), flush=True)
-#                 print([self.timestamps['test_cards_on']//self.dt, self.timestamps['test_cards_off']//self.dt], flush=True)
-                x[np.arange(self.timestamps['test_cards_on']//self.dt, self.timestamps['test_cards_off']//self.dt), x_idx+test_cards[c][r]] = 1
-                x_idx += self.n_features_per_rule
-                    
-        ## target
-        yhat[int(self.timestamps['resp_start']//self.dt):int(self.timestamps['resp_end']//self.dt), match_card_id] = 1    # the response output target
-        for i in range(len(self.rule_list)):
-            if self.rule_list[i]==self.rule:
-                rule_idx = i
-        yhat_rule[int(self.timestamps['trial_start']//self.dt):int(self.timestamps['trial_end']//self.dt), rule_idx] = 1    # the rule output target
-
-        # other information about this trial
-        task_data = {'center_card': center_card, 'test_cards': test_cards, 'correct_id': match_card_id}
         
-#         print('x={}, x_rule={}, yhat={}, yhat_rule={}\n'.format(torch.mean(x, dim=0), torch.mean(x_rule, dim=0), torch.mean(yhat, dim=0), torch.mean(yhat_rule, dim=0)), flush=True)
+        # Test cards
+        for c in range(self.n_test_cards):
+            for r in self.rule_list:
+                x[np.arange(self.timestamps['test_cards_on']//self.dt, self.timestamps['test_cards_off']//self.dt),
+                x_idx + test_cards[c][r]] = 1
+                x_idx += self.n_features_per_rule
+        
+        # Target
+        yhat[int(self.timestamps['resp_start']//self.dt):int(self.timestamps['resp_end']//self.dt), match_card_id] = 1
+        rule_idx = self.rule_list.index(self.rule)
+        yhat_rule[int(self.timestamps['trial_start']//self.dt):int(self.timestamps['trial_end']//self.dt), rule_idx] = 1
+
+        # Other information about this trial
+        task_data = {'center_card': center_card, 'test_cards': test_cards, 'correct_id': match_card_id}
         
         return x, x_rule, yhat, yhat_rule, task_data
         
